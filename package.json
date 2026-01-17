@@ -1,14 +1,17 @@
 {
-  "name": "my-online-store",
+  "name": "momo-wallet-backend",
   "version": "1.0.0",
-  "private": true,
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "socket.io-client": "^4.7.0",
-    "express": "^4.18.0"
-  },
+  "description": "Backend for real-money wallet verification",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "crypto": "^1.0.1",
+    "cors": "^2.8.5"
+  },
+  "engines": {
+    "node": "18.x"
   }
 }
