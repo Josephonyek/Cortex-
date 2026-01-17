@@ -1,88 +1,200 @@
-// --- Inside your Dashboard component ---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Business Dashboard</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-900">
+    <div id="root"></div>
 
-const [showFundModal, setShowFundModal] = useState(false);
-const [fundMethod, setFundMethod] = useState(null); // 'transfer' or 'card'
+    <script type="text/babel">
+        const { useState, useEffect } = React;
 
-const handlePaymentComplete = (amount) => {
-    const newBal = balance + parseFloat(amount);
-    setBalance(newBal);
-    
-    // Save to the specific user's account
-    const userData = JSON.parse(localStorage.getItem(`user_${user.email}`));
-    if (userData) {
-        userData.balance = newBal;
-        localStorage.setItem(`user_${user.email}`, JSON.stringify(userData));
-    }
-    
-    alert("Payment Successful! Your wallet has been updated.");
-    setFundMethod(null);
-    setShowFundModal(false);
-};
+        function Dashboard() {
+            const [user, setUser] = useState(null);
+            const [balance, setBalance] = useState(0);
+            const [showFundModal, setShowFundModal] = useState(false);
+            const [fundMethod, setFundMethod] = useState(null); // 'transfer' or 'card'
+            const [customerList, setCustomerList] = useState([]);
 
-// --- Update the UI to include the Modal ---
-return (
-    <div className="min-h-screen">
-        {/* ... existing nav ... */}
+            useEffect(() => {
+                // 1. Check Authentication
+                const session = JSON.parse(localStorage.getItem('currentUser'));
+                if (!session) {
+                    window.location.href = 'index.html'; // Redirect to login/home
+                } else {
+                    setUser(session);
+                    // 2. Load User Balance
+                    const storedUser = JSON.parse(localStorage.getItem(`user_${session.email}`));
+                    if (storedUser) setBalance(storedUser.balance || 0);
+                }
 
-        <main className="max-w-4xl mx-auto p-6">
-            <div className="bg-blue-600 text-white p-8 rounded-2xl shadow-lg mb-8">
-                <p className="opacity-80">Wallet Balance</p>
-                <h2 className="text-5xl font-bold mb-4">${balance.toFixed(2)}</h2>
-                <button onClick={() => setShowFundModal(true)} className="bg-white text-blue-600 px-6 py-2 rounded-lg font-bold">
-                    + Fund Wallet
-                </button>
-            </div>
+                // 3. Admin: Load all registered customers
+                if (session?.role === 'admin') {
+                    const users = [];
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (key.startsWith('user_')) {
+                            users.push(JSON.parse(localStorage.getItem(key)));
+                        }
+                    }
+                    setCustomerList(users);
+                }
+            }, []);
 
-            {/* FUNDING MODAL */}
-            {showFundModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-                        <div className="flex justify-between mb-4">
-                            <h3 className="text-xl font-bold">Fund Your Wallet</h3>
-                            <button onClick={() => {setShowFundModal(false); setFundMethod(null);}} className="text-gray-400">✕</button>
+            const handlePaymentComplete = (amount) => {
+                if (!amount || isNaN(amount)) return;
+                const newBal = balance + parseFloat(amount);
+                setBalance(newBal);
+                
+                // Update specific user in "Database"
+                const userData = JSON.parse(localStorage.getItem(`user_${user.email}`));
+                if (userData) {
+                    userData.balance = newBal;
+                    localStorage.setItem(`user_${user.email}`, JSON.stringify(userData));
+                }
+                
+                alert(`Successfully funded $${amount}!`);
+                setFundMethod(null);
+                setShowFundModal(false);
+            };
+
+            const logout = () => {
+                localStorage.removeItem('currentUser');
+                window.location.href = 'index.html';
+            };
+
+            if (!user) return <div className="p-10 text-center">Loading...</div>;
+
+            return (
+                <div className="min-h-screen">
+                    {/* TOP NAVIGATION */}
+                    <nav className="bg-white border-b px-8 py-4 flex justify-between items-center shadow-sm">
+                        <h1 className="text-xl font-black text-blue-600 tracking-tight">MY BUSINESS</h1>
+                        <div className="flex items-center gap-4">
+                            <span className="text-sm font-medium bg-gray-100 px-3 py-1 rounded-full">{user.email}</span>
+                            <button onClick={logout} className="text-red-500 font-bold text-sm">Logout</button>
                         </div>
+                    </nav>
 
-                        {!fundMethod ? (
-                            <div className="space-y-3">
-                                <p className="text-gray-500 mb-4">Choose a payment method:</p>
-                                <button onClick={() => setFundMethod('card')} className="w-full p-4 border rounded-xl flex items-center hover:bg-gray-50">
-                                    <span className="text-2xl mr-3">💳</span> Pay with Card
-                                </button>
-                                <button onClick={() => setFundMethod('transfer')} className="w-full p-4 border rounded-xl flex items-center hover:bg-gray-50">
-                                    <span className="text-2xl mr-3">🏦</span> Bank Transfer
-                                </button>
+                    <main className="max-w-5xl mx-auto p-6">
+                        {user.role === 'admin' ? (
+                            /* ADMIN VIEW */
+                            <div className="space-y-6">
+                                <h2 className="text-3xl font-bold">Admin Management</h2>
+                                <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-gray-50 border-b">
+                                            <tr>
+                                                <th className="p-4 font-semibold text-gray-600">Customer Name</th>
+                                                <th className="p-4 font-semibold text-gray-600">Email</th>
+                                                <th className="p-4 font-semibold text-gray-600">Wallet Balance</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {customerList.map(cust => (
+                                                <tr key={cust.email} className="border-b last:border-none">
+                                                    <td className="p-4">{cust.name}</td>
+                                                    <td className="p-4 text-gray-500">{cust.email}</td>
+                                                    <td className="p-4 font-bold text-green-600">${parseFloat(cust.balance || 0).toFixed(2)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                        ) : fundMethod === 'card' ? (
-                            /* CARD FORM */
-                            <form onSubmit={(e) => { e.preventDefault(); handlePaymentComplete(e.target.amount.value); }} className="space-y-4">
-                                <input type="number" name="amount" placeholder="Amount to Add" className="w-full p-3 border rounded-lg" required />
-                                <input type="text" placeholder="Card Number (0000 0000 0000 0000)" className="w-full p-3 border rounded-lg" />
-                                <div className="flex gap-2">
-                                    <input type="text" placeholder="MM/YY" className="w-1/2 p-3 border rounded-lg" />
-                                    <input type="text" placeholder="CVV" className="w-1/2 p-3 border rounded-lg" />
-                                </div>
-                                <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold">Pay Now</button>
-                            </form>
                         ) : (
-                            /* TRANSFER DETAILS */
-                            <div className="space-y-4 text-center">
-                                <div className="bg-gray-50 p-4 rounded-xl border-2 border-dashed border-gray-200">
-                                    <p className="text-sm text-gray-500">Bank Name</p>
-                                    <p className="font-bold text-lg">Business Global Bank</p>
-                                    <p className="text-sm text-gray-500 mt-2">Account Number</p>
-                                    <p className="font-bold text-2xl tracking-widest text-blue-600">0123456789</p>
-                                    <p className="text-sm text-gray-500 mt-2">Account Name</p>
-                                    <p className="font-bold">My Business Store LTD</p>
+                            /* CUSTOMER VIEW */
+                            <div className="space-y-8">
+                                <div className="bg-gradient-to-br from-blue-700 to-blue-500 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
+                                    <div className="relative z-10">
+                                        <p className="text-blue-100 font-medium">Your Wallet Balance</p>
+                                        <h2 className="text-5xl font-black mt-2 mb-6">${balance.toFixed(2)}</h2>
+                                        <button 
+                                            onClick={() => setShowFundModal(true)}
+                                            className="bg-white text-blue-600 px-8 py-3 rounded-xl font-bold hover:bg-blue-50 transition transform hover:scale-105"
+                                        >
+                                            + Fund Wallet
+                                        </button>
+                                    </div>
                                 </div>
-                                <p className="text-xs text-gray-400">After transfer, click the button below to notify Admin.</p>
-                                <button onClick={() => handlePaymentComplete(prompt("Enter amount transferred:"))} className="w-full bg-green-600 text-white py-3 rounded-lg font-bold">I Have Transferred</button>
+
+                                <h3 className="text-2xl font-bold">Available Products</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="bg-white p-6 rounded-2xl border shadow-sm flex justify-between items-center">
+                                        <div>
+                                            <h4 className="font-bold text-lg">Premium Socks Pack</h4>
+                                            <p className="text-blue-600 font-bold">$12.00</p>
+                                        </div>
+                                        <button className="bg-gray-900 text-white px-6 py-2 rounded-lg font-bold">Order Now</button>
+                                    </div>
+                                </div>
                             </div>
                         )}
-                    </div>
-                </div>
-            )}
+                    </main>
 
-            {/* ... rest of the product UI ... */}
-        </main>
-    </div>
-);
+                    {/* FUNDING MODAL */}
+                    {showFundModal && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                            <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="text-2xl font-bold">Fund Wallet</h3>
+                                    <button onClick={() => {setShowFundModal(false); setFundMethod(null);}} className="text-gray-400 text-2xl">✕</button>
+                                </div>
+
+                                {!fundMethod ? (
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <button onClick={() => setFundMethod('card')} className="w-full p-5 border-2 rounded-2xl flex items-center hover:border-blue-500 hover:bg-blue-50 transition">
+                                            <span className="text-3xl mr-4">💳</span>
+                                            <div className="text-left">
+                                                <p className="font-bold">Debit/Credit Card</p>
+                                                <p className="text-xs text-gray-500">Instant funding via card</p>
+                                            </div>
+                                        </button>
+                                        <button onClick={() => setFundMethod('transfer')} className="w-full p-5 border-2 rounded-2xl flex items-center hover:border-blue-500 hover:bg-blue-50 transition">
+                                            <span className="text-3xl mr-4">🏦</span>
+                                            <div className="text-left">
+                                                <p className="font-bold">Bank Transfer</p>
+                                                <p className="text-xs text-gray-500">Direct deposit to bank</p>
+                                            </div>
+                                        </button>
+                                    </div>
+                                ) : fundMethod === 'card' ? (
+                                    <form onSubmit={(e) => { e.preventDefault(); handlePaymentComplete(e.target.amount.value); }} className="space-y-4">
+                                        <input type="number" name="amount" placeholder="Enter Amount ($)" className="w-full p-4 border rounded-xl" required />
+                                        <input type="text" placeholder="Card Number" className="w-full p-4 border rounded-xl" />
+                                        <div className="flex gap-4">
+                                            <input type="text" placeholder="MM/YY" className="w-1/2 p-4 border rounded-xl" />
+                                            <input type="text" placeholder="CVV" className="w-1/2 p-4 border rounded-xl" />
+                                        </div>
+                                        <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold">Pay Now</button>
+                                    </form>
+                                ) : (
+                                    <div className="space-y-6">
+                                        <div className="bg-blue-50 p-6 rounded-2xl border-2 border-dashed border-blue-200">
+                                            <p className="text-xs text-blue-600 uppercase font-bold mb-2">Transfer to Account Below</p>
+                                            <p className="text-sm text-gray-500">Bank Name</p>
+                                            <p className="font-bold">Business Global Bank</p>
+                                            <p className="text-sm text-gray-500 mt-2">Account Number</p>
+                                            <p className="font-black text-2xl text-blue-700 tracking-wider">0123456789</p>
+                                        </div>
+                                        <button onClick={() => handlePaymentComplete(prompt("How much did you transfer?"))} className="w-full bg-green-600 text-white py-4 rounded-xl font-bold">Notify Admin of Transfer</button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<Dashboard />);
+    </script>
+</body>
+</html>
