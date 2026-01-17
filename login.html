@@ -3,42 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login | My Business</title>
+    <title>Login & Sign Up | My Business</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-6">
 
     <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
-        <h2 class="text-3xl font-bold text-center mb-6">Login</h2>
+        <div class="flex mb-8 bg-gray-100 rounded-lg p-1">
+            <button id="loginTab" class="w-1/2 py-2 rounded-md font-bold bg-white shadow-sm text-blue-600" onclick="switchTab('login')">Login</button>
+            <button id="signupTab" class="w-1/2 py-2 rounded-md font-bold text-gray-500" onclick="switchTab('signup')">Sign Up</button>
+        </div>
+
         <form id="loginForm" class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Email Address</label>
-                <input type="email" id="email" placeholder="admin@site.com for admin" class="w-full mt-1 p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Password</label>
-                <input type="password" id="password" class="w-full mt-1 p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
-            </div>
-            <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition">
-                Sign In
-            </button>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Welcome Back</h2>
+            <input type="email" id="loginEmail" placeholder="Email (admin@site.com for admin)" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+            <input type="password" id="loginPass" placeholder="Password" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+            <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition">Sign In</button>
+        </form>
+
+        <form id="signupForm" class="space-y-4 hidden">
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Create Account</h2>
+            <input type="text" id="newName" placeholder="Full Name" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+            <input type="email" id="newEmail" placeholder="Email Address" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+            <input type="password" id="newPass" placeholder="Create Password" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+            <button type="submit" class="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition">Register Now</button>
         </form>
     </div>
 
     <script>
+        // Toggle between Login and Signup
+        function switchTab(type) {
+            const loginForm = document.getElementById('loginForm');
+            const signupForm = document.getElementById('signupForm');
+            const lTab = document.getElementById('loginTab');
+            const sTab = document.getElementById('signupTab');
+
+            if (type === 'signup') {
+                loginForm.classList.add('hidden');
+                signupForm.classList.remove('hidden');
+                sTab.classList.add('bg-white', 'shadow-sm', 'text-blue-600');
+                lTab.classList.remove('bg-white', 'shadow-sm', 'text-blue-600');
+                lTab.classList.add('text-gray-500');
+            } else {
+                signupForm.classList.add('hidden');
+                loginForm.classList.remove('hidden');
+                lTab.classList.add('bg-white', 'shadow-sm', 'text-blue-600');
+                sTab.classList.remove('bg-white', 'shadow-sm', 'text-blue-600');
+                sTab.classList.add('text-gray-500');
+            }
+        }
+
+        // Handle Sign Up
+        document.getElementById('signupForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const userData = {
+                name: document.getElementById('newName').value,
+                email: document.getElementById('newEmail').value,
+                pass: document.getElementById('newPass').value,
+                balance: 0 // Starting wallet balance
+            };
+            // Save user to "database" (localStorage)
+            localStorage.setItem(`user_${userData.email}`, JSON.stringify(userData));
+            alert("Account created successfully! Please login.");
+            switchTab('login');
+        });
+
+        // Handle Login
         document.getElementById('loginForm').addEventListener('submit', (e) => {
             e.preventDefault();
-            const email = document.getElementById('email').value;
-            
-            // Save user session to localStorage
-            const user = {
-                email: email,
-                role: email === 'admin@site.com' ? 'admin' : 'customer'
-            };
-            localStorage.setItem('currentUser', JSON.stringify(user));
+            const email = document.getElementById('loginEmail').value;
+            const pass = document.getElementById('loginPass').value;
 
-            // Redirect to dashboard
-            window.location.href = 'dashboard.html';
+            // Check if Admin
+            if (email === 'admin@site.com' && pass === 'admin123') {
+                localStorage.setItem('currentUser', JSON.stringify({ email, role: 'admin' }));
+                window.location.href = 'dashboard.html';
+                return;
+            }
+
+            // Check if Registered User
+            const storedUser = JSON.parse(localStorage.getItem(`user_${email}`));
+            if (storedUser && storedUser.pass === pass) {
+                localStorage.setItem('currentUser', JSON.stringify({ ...storedUser, role: 'customer' }));
+                window.location.href = 'dashboard.html';
+            } else {
+                alert("Invalid email or password!");
+            }
         });
     </script>
 </body>
