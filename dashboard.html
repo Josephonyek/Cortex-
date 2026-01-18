@@ -3,21 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cortex Gold | Dashboard</title>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <title>Cortex Gold Dashboard</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    
     <script src="https://js.paystack.co/v1/inline.js"></script> 
 </head>
-<body class="bg-gray-50 text-gray-900">
+<body class="bg-gray-50">
     <div id="root"></div>
 
     <script type="text/babel">
-        // 1. FIREBASE CONFIG
+        const { useState, useEffect } = React;
+
+        // 1. CONFIG
         const firebaseConfig = {
             apiKey: "AIzaSyAzXdmATMQ8bMAtCIMiruUr4o5lGLMTSco",
             authDomain: "cortex-gold-6c147.firebaseapp.com",
@@ -25,110 +28,82 @@
             projectId: "cortex-gold-6c147",
             storageBucket: "cortex-gold-6c147.firebasestorage.app",
             messagingSenderId: "744887943177",
-            appId: "1:744887943177:web:c0f4aa606e6e204c7d38d8",
-            measurementId: "G-7F8Y8DHZ9H"
+            appId: "1:744887943177:web:c0f4aa606e6e204c7d38d8"
         };
 
-        firebase.initializeApp(firebaseConfig);
+        // Initialize Firebase safely
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
         const db = firebase.database();
-
-        const { useState, useEffect } = React;
 
         function Dashboard() {
             const [user, setUser] = useState(null);
             const [balance, setBalance] = useState(0);
-            const [showFundModal, setShowFundModal] = useState(false);
+            const [loading, setLoading] = useState(true);
 
             useEffect(() => {
+                console.log("Dashboard Loaded");
                 const session = JSON.parse(localStorage.getItem('currentUser'));
+                
                 if (!session) {
+                    console.log("No session found, redirecting...");
                     window.location.href = 'index.html';
-                } else {
-                    setUser(session);
-                    // REAL-TIME CLOUD LISTENER
-                    const userRef = db.ref(`users/${session.email.replace('.', '_')}/balance`);
-                    userRef.on('value', (snapshot) => {
-                        setBalance(snapshot.val() || 0);
-                    });
-                }
-            }, []);
-
-            // 2. THE AUTOMATIC PAYSTACK TRIGGER
-            const triggerPaystack = () => {
-                const amount = prompt("How much Naira do you want to add to your wallet?");
-                if (!amount || isNaN(amount) || amount < 100) {
-                    alert("Minimum funding is 100 Naira");
                     return;
                 }
 
+                setUser(session);
+                
+                // Sync Balance from Firebase
+                const userEmailKey = session.email.replace(/\./g, '_');
+                const balanceRef = db.ref(`users/${userEmailKey}/balance`);
+                
+                balanceRef.on('value', (snapshot) => {
+                    setBalance(snapshot.val() || 0);
+                    setLoading(false);
+                });
+            }, []);
+
+            const triggerPaystack = () => {
+                const amount = prompt("Enter amount in Naira:");
+                if (!amount || amount < 100) return alert("Min 100 Naira");
+
                 const handler = PaystackPop.setup({
-                    key: ' pk_test_77e96f0549cd29e76ce2117f8adf00a5a96658ea '// PASTE YOUR PUBLIC KEY HERE
+                    key: ' pk_test_77e96f0549cd29e76ce2117f8adf00a5a96658ea ', // CHANGE THIS
                     email: user.email,
-                    amount: amount * 100, // Naira to Kobo
+                    amount: amount * 100,
                     currency: "NGN",
-                    channels: ['bank_transfer', 'card'],
-                    metadata: {
-                        custom_fields: [{ display_name: "Email", variable_name: "email", value: user.email }]
-                    },
-                    callback: function(response) {
-                        alert("Transfer detected! Balance will update automatically once bank confirms (approx 1-2 mins).");
-                        setShowFundModal(false);
-                    },
-                    onClose: function() {
-                        alert("Transaction cancelled.");
+                    callback: (response) => {
+                        alert("Payment successful! Checking bank...");
                     }
                 });
                 handler.openIframe();
             };
 
-            const logout = () => {
-                localStorage.removeItem('currentUser');
-                window.location.href = 'index.html';
-            };
-
-            if (!user) return <div className="p-10 text-center">Loading Cloud...</div>;
+            if (loading) return <div className="flex h-screen items-center justify-center font-bold">Connecting to Cloud...</div>;
 
             return (
-                <div className="min-h-screen">
-                    <nav className="bg-white border-b px-8 py-4 flex justify-between items-center shadow-sm">
-                        <h1 className="text-xl font-black text-blue-600 tracking-tight">CORTEX GOLD</h1>
-                        <div className="flex items-center gap-4">
-                            <span className="text-sm font-medium bg-gray-100 px-3 py-1 rounded-full">{user.email}</span>
-                            <button onClick={logout} className="text-red-500 font-bold text-sm">Logout</button>
+                <div className="min-h-screen bg-gray-100 p-4">
+                    <div className="max-w-md mx-auto bg-white rounded-3xl shadow-lg p-6 mt-10 border border-gray-200">
+                        <div className="flex justify-between items-center mb-6">
+                            <h1 className="text-blue-600 font-black text-xl">CORTEX GOLD</h1>
+                            <button onClick={() => {localStorage.clear(); window.location.href='index.html'}} className="text-red-400 text-xs font-bold uppercase">Logout</button>
                         </div>
-                    </nav>
 
-                    <main className="max-w-5xl mx-auto p-6 text-center">
-                        <div className="bg-gradient-to-br from-blue-700 to-blue-500 rounded-3xl p-10 text-white shadow-xl">
-                            <p className="text-blue-100 font-medium">Cloud Wallet Balance</p>
-                            <h2 className="text-6xl font-black mt-2 mb-8">₦{balance.toLocaleString()}</h2>
-                            <button 
-                                onClick={() => setShowFundModal(true)}
-                                className="bg-white text-blue-600 px-10 py-4 rounded-2xl font-black shadow-lg hover:scale-105 transition"
-                            >
-                                + ADD MONEY
-                            </button>
+                        <div className="bg-blue-600 rounded-2xl p-6 text-white mb-6">
+                            <p className="text-blue-100 text-xs font-bold uppercase tracking-wider">Wallet Balance</p>
+                            <h2 className="text-4xl font-black mt-1">₦{balance.toLocaleString()}</h2>
                         </div>
-                    </main>
 
-                    {/* FUNDING MODAL */}
-                    {showFundModal && (
-                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                            <div className="bg-white rounded-3xl p-8 w-full max-w-md">
-                                <h3 className="text-2xl font-bold mb-6 text-center">Choose Funding Method</h3>
-                                <div className="space-y-4">
-                                    <button onClick={triggerPaystack} className="w-full p-6 border-2 border-blue-100 rounded-2xl flex items-center hover:bg-blue-50 transition">
-                                        <span className="text-3xl mr-4">🏦</span>
-                                        <div className="text-left">
-                                            <p className="font-bold">Automatic Bank Transfer</p>
-                                            <p className="text-xs text-gray-500">Paystack generates an account for you</p>
-                                        </div>
-                                    </button>
-                                    <button onClick={() => setShowFundModal(false)} className="w-full py-3 text-gray-400 font-medium">Cancel</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                        <button 
+                            onClick={triggerPaystack}
+                            className="w-full bg-black text-white py-4 rounded-xl font-bold hover:bg-gray-800 transition"
+                        >
+                            + Fund Wallet
+                        </button>
+                        
+                        <p className="text-center text-gray-400 text-xs mt-6">User ID: {user.email}</p>
+                    </div>
                 </div>
             );
         }
