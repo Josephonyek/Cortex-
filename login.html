@@ -3,93 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login & Sign Up | My Business</title>
+    <title>Cortex Gold | Login</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen p-6">
+<body class="bg-gray-50">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState } = React;
 
-    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
-        <div class="flex mb-8 bg-gray-100 rounded-lg p-1">
-            <button id="loginTab" class="w-1/2 py-2 rounded-md font-bold bg-white shadow-sm text-blue-600" onclick="switchTab('login')">Login</button>
-            <button id="signupTab" class="w-1/2 py-2 rounded-md font-bold text-gray-500" onclick="switchTab('signup')">Sign Up</button>
-        </div>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAzXdmATMQ8bMAtCIMiruUr4o5lGLMTSco",
+            authDomain: "cortex-gold-6c147.firebaseapp.com",
+            databaseURL: "https://cortex-gold-6c147-default-rtdb.firebaseio.com",
+            projectId: "cortex-gold-6c147",
+            storageBucket: "cortex-gold-6c147.firebasestorage.app",
+            messagingSenderId: "744887943177",
+            appId: "1:744887943177:web:c0f4aa606e6e204c7d38d8"
+        };
 
-        <form id="loginForm" class="space-y-4">
-            <h2 class="text-2xl font-bold text-gray-800 mb-2">Welcome Back</h2>
-            <input type="email" id="loginEmail" placeholder="Email (admin@site.com for admin)" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
-            <input type="password" id="loginPass" placeholder="Password" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
-            <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition">Sign In</button>
-        </form>
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
 
-        <form id="signupForm" class="space-y-4 hidden">
-            <h2 class="text-2xl font-bold text-gray-800 mb-2">Create Account</h2>
-            <input type="text" id="newName" placeholder="Full Name" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
-            <input type="email" id="newEmail" placeholder="Email Address" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
-            <input type="password" id="newPass" placeholder="Create Password" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
-            <button type="submit" class="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition">Register Now</button>
-        </form>
-    </div>
+        function Auth() {
+            const [isLogin, setIsLogin] = useState(true);
+            const [email, setEmail] = useState('');
+            const [name, setName] = useState('');
 
-    <script>
-        // Toggle between Login and Signup
-        function switchTab(type) {
-            const loginForm = document.getElementById('loginForm');
-            const signupForm = document.getElementById('signupForm');
-            const lTab = document.getElementById('loginTab');
-            const sTab = document.getElementById('signupTab');
-
-            if (type === 'signup') {
-                loginForm.classList.add('hidden');
-                signupForm.classList.remove('hidden');
-                sTab.classList.add('bg-white', 'shadow-sm', 'text-blue-600');
-                lTab.classList.remove('bg-white', 'shadow-sm', 'text-blue-600');
-                lTab.classList.add('text-gray-500');
-            } else {
-                signupForm.classList.add('hidden');
-                loginForm.classList.remove('hidden');
-                lTab.classList.add('bg-white', 'shadow-sm', 'text-blue-600');
-                sTab.classList.remove('bg-white', 'shadow-sm', 'text-blue-600');
-                sTab.classList.add('text-gray-500');
-            }
-        }
-
-        // Handle Sign Up
-        document.getElementById('signupForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const userData = {
-                name: document.getElementById('newName').value,
-                email: document.getElementById('newEmail').value,
-                pass: document.getElementById('newPass').value,
-                balance: 0 // Starting wallet balance
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                const userKey = email.replace(/\./g, '_');
+                
+                if (isLogin) {
+                    db.ref(`users/${userKey}`).once('value', (snapshot) => {
+                        if (snapshot.exists()) {
+                            localStorage.setItem('currentUser', JSON.stringify(snapshot.val()));
+                            window.location.href = 'dashboard.html';
+                        } else {
+                            alert("Account not found. Please Sign Up!");
+                        }
+                    });
+                } else {
+                    const newUser = { email, name, balance: 0, role: 'user' };
+                    await db.ref(`users/${userKey}`).set(newUser);
+                    localStorage.setItem('currentUser', JSON.stringify(newUser));
+                    window.location.href = 'dashboard.html';
+                }
             };
-            // Save user to "database" (localStorage)
-            localStorage.setItem(`user_${userData.email}`, JSON.stringify(userData));
-            alert("Account created successfully! Please login.");
-            switchTab('login');
-        });
 
-        // Handle Login
-        document.getElementById('loginForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const email = document.getElementById('loginEmail').value;
-            const pass = document.getElementById('loginPass').value;
-
-            // Check if Admin
-            if (email === 'admin@site.com' && pass === 'admin123') {
-                localStorage.setItem('currentUser', JSON.stringify({ email, role: 'admin' }));
-                window.location.href = 'dashboard.html';
-                return;
-            }
-
-            // Check if Registered User
-            const storedUser = JSON.parse(localStorage.getItem(`user_${email}`));
-            if (storedUser && storedUser.pass === pass) {
-                localStorage.setItem('currentUser', JSON.stringify({ ...storedUser, role: 'customer' }));
-                window.location.href = 'dashboard.html';
-            } else {
-                alert("Invalid email or password!");
-            }
-        });
+            return (
+                <div className="flex min-h-screen items-center justify-center p-4">
+                    <div className="w-full max-w-sm bg-white p-8 rounded-3xl shadow-xl border">
+                        <h1 className="text-2xl font-black text-blue-600 text-center mb-6">CORTEX GOLD</h1>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            {!isLogin && (
+                                <input type="text" placeholder="Full Name" className="w-full p-4 border rounded-xl" onChange={e => setName(e.target.value)} required />
+                            )}
+                            <input type="email" placeholder="Email" className="w-full p-4 border rounded-xl" onChange={e => setEmail(e.target.value)} required />
+                            <button className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold">
+                                {isLogin ? 'Login' : 'Create Account'}
+                            </button>
+                        </form>
+                        <button onClick={() => setIsLogin(!isLogin)} className="w-full mt-4 text-sm text-gray-500">
+                            {isLogin ? "Need an account? Sign Up" : "Have an account? Login"}
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+        ReactDOM.createRoot(document.getElementById('root')).render(<Auth />);
     </script>
 </body>
 </html>
