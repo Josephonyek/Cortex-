@@ -15,7 +15,6 @@
     <div id="root"></div>
     <script type="text/babel">
         const { useState } = React;
-
         const firebaseConfig = {
             apiKey: "AIzaSyAzXdmATMQ8bMAtCIMiruUr4o5lGLMTSco",
             authDomain: "cortex-gold-6c147.firebaseapp.com",
@@ -25,57 +24,52 @@
             messagingSenderId: "744887943177",
             appId: "1:744887943177:web:c0f4aa606e6e204c7d38d8"
         };
-
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        function Auth() {
-            const [isLogin, setIsLogin] = useState(true);
+        function Login() {
             const [email, setEmail] = useState('');
-            const [name, setName] = useState('');
+            const [isNewUser, setIsNewUser] = useState(false);
 
-            const handleSubmit = async (e) => {
+            const handleAuth = async (e) => {
                 e.preventDefault();
-                const userKey = email.replace(/\./g, '_');
+                const userKey = email.toLowerCase().replace(/\./g, '_');
                 
-                if (isLogin) {
-                    db.ref(`users/${userKey}`).once('value', (snapshot) => {
-                        if (snapshot.exists()) {
-                            localStorage.setItem('currentUser', JSON.stringify(snapshot.val()));
-                            window.location.href = 'dashboard.html';
-                        } else {
-                            alert("Account not found. Please Sign Up!");
-                        }
-                    });
-                } else {
-                    const newUser = { email, name, balance: 0, role: 'user' };
+                if (isNewUser) {
+                    const newUser = { email: email.toLowerCase(), balance: 0 };
                     await db.ref(`users/${userKey}`).set(newUser);
                     localStorage.setItem('currentUser', JSON.stringify(newUser));
                     window.location.href = 'dashboard.html';
+                } else {
+                    db.ref(`users/${userKey}`).once('value', (snap) => {
+                        if (snap.exists()) {
+                            localStorage.setItem('currentUser', JSON.stringify(snap.val()));
+                            window.location.href = 'dashboard.html';
+                        } else {
+                            alert("User not found. Try Signing Up!");
+                        }
+                    });
                 }
             };
 
             return (
-                <div className="flex min-h-screen items-center justify-center p-4">
-                    <div className="w-full max-w-sm bg-white p-8 rounded-3xl shadow-xl border">
-                        <h1 className="text-2xl font-black text-blue-600 text-center mb-6">CORTEX GOLD</h1>
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            {!isLogin && (
-                                <input type="text" placeholder="Full Name" className="w-full p-4 border rounded-xl" onChange={e => setName(e.target.value)} required />
-                            )}
-                            <input type="email" placeholder="Email" className="w-full p-4 border rounded-xl" onChange={e => setEmail(e.target.value)} required />
+                <div className="flex min-h-screen items-center justify-center p-6">
+                    <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-sm">
+                        <h2 className="text-2xl font-black text-blue-600 mb-6 text-center">CORTEX GOLD</h2>
+                        <form onSubmit={handleAuth} className="space-y-4">
+                            <input type="email" placeholder="Enter Email" className="w-full p-4 border rounded-xl" onChange={e => setEmail(e.target.value)} required />
                             <button className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold">
-                                {isLogin ? 'Login' : 'Create Account'}
+                                {isNewUser ? 'Create Wallet' : 'Login to Wallet'}
                             </button>
                         </form>
-                        <button onClick={() => setIsLogin(!isLogin)} className="w-full mt-4 text-sm text-gray-500">
-                            {isLogin ? "Need an account? Sign Up" : "Have an account? Login"}
+                        <button onClick={() => setIsNewUser(!isNewUser)} className="w-full mt-4 text-xs text-gray-400 font-bold uppercase">
+                            {isNewUser ? 'Already have a wallet? Login' : 'Need a wallet? Sign up'}
                         </button>
                     </div>
                 </div>
             );
         }
-        ReactDOM.createRoot(document.getElementById('root')).render(<Auth />);
+        ReactDOM.createRoot(document.getElementById('root')).render(<Login />);
     </script>
 </body>
 </html>
