@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cortex Gold Dashboard</title>
+    <title>Cortex Gold | Dashboard</title>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -11,12 +11,13 @@
 
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    <script src="https://js.paystack.co/v1/inline.js"></script> 
 </head>
 <body class="bg-gray-50 text-gray-900">
     <div id="root"></div>
 
     <script type="text/babel">
-        // 1. YOUR FIREBASE CONFIG
+        // 1. FIREBASE CONFIG
         const firebaseConfig = {
             apiKey: "AIzaSyAzXdmATMQ8bMAtCIMiruUr4o5lGLMTSco",
             authDomain: "cortex-gold-6c147.firebaseapp.com",
@@ -28,7 +29,6 @@
             measurementId: "G-7F8Y8DHZ9H"
         };
 
-        // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
@@ -38,8 +38,6 @@
             const [user, setUser] = useState(null);
             const [balance, setBalance] = useState(0);
             const [showFundModal, setShowFundModal] = useState(false);
-            const [fundMethod, setFundMethod] = useState(null); 
-            const [customerList, setCustomerList] = useState([]);
 
             useEffect(() => {
                 const session = JSON.parse(localStorage.getItem('currentUser'));
@@ -47,42 +45,40 @@
                     window.location.href = 'index.html';
                 } else {
                     setUser(session);
-                    
-                    // 2. CLOUD SYNC: Listen for real-time balance changes
-                    const userBalanceRef = db.ref(`users/${session.email.replace('.', '_')}/balance`);
-                    userBalanceRef.on('value', (snapshot) => {
-                        const cloudBalance = snapshot.val();
-                        setBalance(cloudBalance || 0);
-                    });
-                }
-
-                // 3. ADMIN: Load all customers from Cloud
-                if (session?.role === 'admin') {
-                    db.ref('users').on('value', (snapshot) => {
-                        const data = snapshot.val();
-                        if (data) {
-                            const list = Object.keys(data).map(key => data[key]);
-                            setCustomerList(list);
-                        }
+                    // REAL-TIME CLOUD LISTENER
+                    const userRef = db.ref(`users/${session.email.replace('.', '_')}/balance`);
+                    userRef.on('value', (snapshot) => {
+                        setBalance(snapshot.val() || 0);
                     });
                 }
             }, []);
 
-            const handlePaymentComplete = (amount) => {
-                if (!amount || isNaN(amount)) return;
-                const newBal = balance + parseFloat(amount);
-                
-                // 4. SAVE TO CLOUD (Replaces localStorage)
-                const userKey = user.email.replace('.', '_');
-                db.ref(`users/${userKey}`).update({
-                    balance: newBal,
+            // 2. THE AUTOMATIC PAYSTACK TRIGGER
+            const triggerPaystack = () => {
+                const amount = prompt("How much Naira do you want to add to your wallet?");
+                if (!amount || isNaN(amount) || amount < 100) {
+                    alert("Minimum funding is 100 Naira");
+                    return;
+                }
+
+                const handler = PaystackPop.setup({
+                    key: ' pk_test_77e96f0549cd29e76ce2117f8adf00a5a96658ea '// PASTE YOUR PUBLIC KEY HERE
                     email: user.email,
-                    name: user.name || "Customer"
+                    amount: amount * 100, // Naira to Kobo
+                    currency: "NGN",
+                    channels: ['bank_transfer', 'card'],
+                    metadata: {
+                        custom_fields: [{ display_name: "Email", variable_name: "email", value: user.email }]
+                    },
+                    callback: function(response) {
+                        alert("Transfer detected! Balance will update automatically once bank confirms (approx 1-2 mins).");
+                        setShowFundModal(false);
+                    },
+                    onClose: function() {
+                        alert("Transaction cancelled.");
+                    }
                 });
-                
-                alert(`Successfully funded $${amount}!`);
-                setFundMethod(null);
-                setShowFundModal(false);
+                handler.openIframe();
             };
 
             const logout = () => {
@@ -94,7 +90,6 @@
 
             return (
                 <div className="min-h-screen">
-                    {/* TOP NAVIGATION */}
                     <nav className="bg-white border-b px-8 py-4 flex justify-between items-center shadow-sm">
                         <h1 className="text-xl font-black text-blue-600 tracking-tight">CORTEX GOLD</h1>
                         <div className="flex items-center gap-4">
@@ -103,110 +98,34 @@
                         </div>
                     </nav>
 
-                    <main className="max-w-5xl mx-auto p-6">
-                        {user.role === 'admin' ? (
-                            /* ADMIN VIEW */
-                            <div className="space-y-6">
-                                <h2 className="text-3xl font-bold">Admin Management</h2>
-                                <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-                                    <table className="w-full text-left">
-                                        <thead className="bg-gray-50 border-b">
-                                            <tr>
-                                                <th className="p-4 font-semibold text-gray-600">Customer</th>
-                                                <th className="p-4 font-semibold text-gray-600">Email</th>
-                                                <th className="p-4 font-semibold text-gray-600">Wallet Balance</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {customerList.map(cust => (
-                                                <tr key={cust.email} className="border-b last:border-none">
-                                                    <td className="p-4">{cust.name}</td>
-                                                    <td className="p-4 text-gray-500">{cust.email}</td>
-                                                    <td className="p-4 font-bold text-green-600">${parseFloat(cust.balance || 0).toFixed(2)}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        ) : (
-                            /* CUSTOMER VIEW */
-                            <div className="space-y-8">
-                                <div className="bg-gradient-to-br from-blue-700 to-blue-500 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
-                                    <div className="relative z-10">
-                                        <p className="text-blue-100 font-medium">Your Wallet Balance</p>
-                                        <h2 className="text-5xl font-black mt-2 mb-6">${balance.toFixed(2)}</h2>
-                                        <button 
-                                            onClick={() => setShowFundModal(true)}
-                                            className="bg-white text-blue-600 px-8 py-3 rounded-xl font-bold hover:bg-blue-50 transition transform hover:scale-105"
-                                        >
-                                            + Fund Wallet
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <h3 className="text-2xl font-bold">Available Products</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="bg-white p-6 rounded-2xl border shadow-sm flex justify-between items-center">
-                                        <div>
-                                            <h4 className="font-bold text-lg">Premium Socks Pack</h4>
-                                            <p className="text-blue-600 font-bold">$12.00</p>
-                                        </div>
-                                        <button className="bg-gray-900 text-white px-6 py-2 rounded-lg font-bold">Order Now</button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+                    <main className="max-w-5xl mx-auto p-6 text-center">
+                        <div className="bg-gradient-to-br from-blue-700 to-blue-500 rounded-3xl p-10 text-white shadow-xl">
+                            <p className="text-blue-100 font-medium">Cloud Wallet Balance</p>
+                            <h2 className="text-6xl font-black mt-2 mb-8">₦{balance.toLocaleString()}</h2>
+                            <button 
+                                onClick={() => setShowFundModal(true)}
+                                className="bg-white text-blue-600 px-10 py-4 rounded-2xl font-black shadow-lg hover:scale-105 transition"
+                            >
+                                + ADD MONEY
+                            </button>
+                        </div>
                     </main>
 
                     {/* FUNDING MODAL */}
                     {showFundModal && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                            <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h3 className="text-2xl font-bold">Fund Wallet</h3>
-                                    <button onClick={() => {setShowFundModal(false); setFundMethod(null);}} className="text-gray-400 text-2xl">✕</button>
+                            <div className="bg-white rounded-3xl p-8 w-full max-w-md">
+                                <h3 className="text-2xl font-bold mb-6 text-center">Choose Funding Method</h3>
+                                <div className="space-y-4">
+                                    <button onClick={triggerPaystack} className="w-full p-6 border-2 border-blue-100 rounded-2xl flex items-center hover:bg-blue-50 transition">
+                                        <span className="text-3xl mr-4">🏦</span>
+                                        <div className="text-left">
+                                            <p className="font-bold">Automatic Bank Transfer</p>
+                                            <p className="text-xs text-gray-500">Paystack generates an account for you</p>
+                                        </div>
+                                    </button>
+                                    <button onClick={() => setShowFundModal(false)} className="w-full py-3 text-gray-400 font-medium">Cancel</button>
                                 </div>
-
-                                {!fundMethod ? (
-                                    <div className="grid grid-cols-1 gap-4">
-                                        <button onClick={() => setFundMethod('card')} className="w-full p-5 border-2 rounded-2xl flex items-center hover:border-blue-500 hover:bg-blue-50 transition">
-                                            <span className="text-3xl mr-4">💳</span>
-                                            <div className="text-left">
-                                                <p className="font-bold">Debit/Credit Card</p>
-                                                <p className="text-xs text-gray-500">Instant funding via card</p>
-                                            </div>
-                                        </button>
-                                        <button onClick={() => setFundMethod('transfer')} className="w-full p-5 border-2 rounded-2xl flex items-center hover:border-blue-500 hover:bg-blue-50 transition">
-                                            <span className="text-3xl mr-4">🏦</span>
-                                            <div className="text-left">
-                                                <p className="font-bold">Bank Transfer</p>
-                                                <p className="text-xs text-gray-500">Direct deposit to bank</p>
-                                            </div>
-                                        </button>
-                                    </div>
-                                ) : fundMethod === 'card' ? (
-                                    <form onSubmit={(e) => { e.preventDefault(); handlePaymentComplete(e.target.amount.value); }} className="space-y-4">
-                                        <input type="number" name="amount" placeholder="Enter Amount ($)" className="w-full p-4 border rounded-xl" required />
-                                        <input type="text" placeholder="Card Number" className="w-full p-4 border rounded-xl" />
-                                        <div className="flex gap-4">
-                                            <input type="text" placeholder="MM/YY" className="w-1/2 p-4 border rounded-xl" />
-                                            <input type="text" placeholder="CVV" className="w-1/2 p-4 border rounded-xl" />
-                                        </div>
-                                        <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold">Pay Now</button>
-                                    </form>
-                                ) : (
-                                    <div className="space-y-6">
-                                        <div className="bg-blue-50 p-6 rounded-2xl border-2 border-dashed border-blue-200">
-                                            <p className="text-xs text-blue-600 uppercase font-bold mb-2">Transfer to Account Below</p>
-                                            <p className="text-sm text-gray-500">Bank Name</p>
-                                            <p className="font-bold">Business Global Bank</p>
-                                            <p className="text-sm text-gray-500 mt-2">Account Number</p>
-                                            <p className="font-black text-2xl text-blue-700 tracking-wider">0123456789</p>
-                                        </div>
-                                        <button onClick={() => handlePaymentComplete(prompt("How much did you transfer?"))} className="w-full bg-green-600 text-white py-4 rounded-xl font-bold">Notify Admin of Transfer</button>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     )}
