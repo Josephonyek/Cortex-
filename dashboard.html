@@ -3,24 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cortex Gold Dashboard</title>
+    <title>Cortex Gold | Wallet</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
-    
-    <script src="https://js.paystack.co/v1/inline.js"></script> 
+    <script src="https://js.paystack.co/v1/inline.js"></script>
 </head>
 <body class="bg-gray-50">
     <div id="root"></div>
-
     <script type="text/babel">
         const { useState, useEffect } = React;
-
-        // 1. CONFIG
         const firebaseConfig = {
             apiKey: "AIzaSyAzXdmATMQ8bMAtCIMiruUr4o5lGLMTSco",
             authDomain: "cortex-gold-6c147.firebaseapp.com",
@@ -30,86 +25,66 @@
             messagingSenderId: "744887943177",
             appId: "1:744887943177:web:c0f4aa606e6e204c7d38d8"
         };
-
-        // Initialize Firebase safely
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
+        firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
         function Dashboard() {
             const [user, setUser] = useState(null);
             const [balance, setBalance] = useState(0);
-            const [loading, setLoading] = useState(true);
 
             useEffect(() => {
-                console.log("Dashboard Loaded");
                 const session = JSON.parse(localStorage.getItem('currentUser'));
                 
+                // CRITICAL: If no session, go to your login page
                 if (!session) {
-                    console.log("No session found, redirecting...");
-                    window.location.href = 'index.html';
+                    window.location.href = 'login.html'; 
                     return;
                 }
-
+                
                 setUser(session);
+                const userKey = session.email.replace(/\./g, '_');
                 
-                // Sync Balance from Firebase
-                const userEmailKey = session.email.replace(/\./g, '_');
-                const balanceRef = db.ref(`users/${userEmailKey}/balance`);
-                
-                balanceRef.on('value', (snapshot) => {
-                    setBalance(snapshot.val() || 0);
-                    setLoading(false);
+                // Real-time Cloud Sync
+                db.ref(`users/${userKey}/balance`).on('value', (snap) => {
+                    setBalance(snap.val() || 0);
                 });
             }, []);
 
-            const triggerPaystack = () => {
-                const amount = prompt("Enter amount in Naira:");
-                if (!amount || amount < 100) return alert("Min 100 Naira");
+            const fundWallet = () => {
+                const amt = prompt("Amount (NGN):");
+                if (!amt || amt < 100) return;
 
                 const handler = PaystackPop.setup({
-                    key: ' pk_test_77e96f0549cd29e76ce2117f8adf00a5a96658ea ', // CHANGE THIS
+                    key: 'pk_test_77e96f0549cd29e76ce2117f8adf00a5a96658ea',
                     email: user.email,
-                    amount: amount * 100,
+                    amount: amt * 100,
                     currency: "NGN",
                     callback: (response) => {
-                        alert("Payment successful! Checking bank...");
+                        alert("Transfer detected! Updating your wallet...");
                     }
                 });
                 handler.openIframe();
             };
 
-            if (loading) return <div className="flex h-screen items-center justify-center font-bold">Connecting to Cloud...</div>;
+            if (!user) return <div className="text-center p-20">Loading...</div>;
 
             return (
-                <div className="min-h-screen bg-gray-100 p-4">
-                    <div className="max-w-md mx-auto bg-white rounded-3xl shadow-lg p-6 mt-10 border border-gray-200">
-                        <div className="flex justify-between items-center mb-6">
-                            <h1 className="text-blue-600 font-black text-xl">CORTEX GOLD</h1>
-                            <button onClick={() => {localStorage.clear(); window.location.href='index.html'}} className="text-red-400 text-xs font-bold uppercase">Logout</button>
+                <div className="min-h-screen p-6">
+                    <div className="max-w-md mx-auto bg-white p-8 rounded-3xl shadow-xl">
+                        <h1 className="text-blue-600 font-black text-xl mb-4 text-center">CORTEX GOLD</h1>
+                        <div className="bg-blue-600 text-white p-6 rounded-2xl mb-6">
+                            <p className="text-xs font-bold opacity-70">BALANCE</p>
+                            <h2 className="text-4xl font-black">₦{balance.toLocaleString()}</h2>
                         </div>
-
-                        <div className="bg-blue-600 rounded-2xl p-6 text-white mb-6">
-                            <p className="text-blue-100 text-xs font-bold uppercase tracking-wider">Wallet Balance</p>
-                            <h2 className="text-4xl font-black mt-1">₦{balance.toLocaleString()}</h2>
-                        </div>
-
-                        <button 
-                            onClick={triggerPaystack}
-                            className="w-full bg-black text-white py-4 rounded-xl font-bold hover:bg-gray-800 transition"
-                        >
+                        <button onClick={fundWallet} className="w-full bg-black text-white py-4 rounded-xl font-bold">
                             + Fund Wallet
                         </button>
-                        
-                        <p className="text-center text-gray-400 text-xs mt-6">User ID: {user.email}</p>
+                        <button onClick={() => {localStorage.clear(); window.location.href='login.html'}} className="w-full mt-4 text-gray-400 text-sm">Logout</button>
                     </div>
                 </div>
             );
         }
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<Dashboard />);
+        ReactDOM.createRoot(document.getElementById('root')).render(<Dashboard />);
     </script>
 </body>
 </html>
