@@ -3,61 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Business Dashboard</title>
+    <title>Cortex Gold Dashboard</title>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
 </head>
 <body class="bg-gray-50 text-gray-900">
     <div id="root"></div>
 
     <script type="text/babel">
+        // 1. YOUR FIREBASE CONFIG
+        const firebaseConfig = {
+            apiKey: "AIzaSyAzXdmATMQ8bMAtCIMiruUr4o5lGLMTSco",
+            authDomain: "cortex-gold-6c147.firebaseapp.com",
+            databaseURL: "https://cortex-gold-6c147-default-rtdb.firebaseio.com",
+            projectId: "cortex-gold-6c147",
+            storageBucket: "cortex-gold-6c147.firebasestorage.app",
+            messagingSenderId: "744887943177",
+            appId: "1:744887943177:web:c0f4aa606e6e204c7d38d8",
+            measurementId: "G-7F8Y8DHZ9H"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
         const { useState, useEffect } = React;
 
         function Dashboard() {
             const [user, setUser] = useState(null);
             const [balance, setBalance] = useState(0);
             const [showFundModal, setShowFundModal] = useState(false);
-            const [fundMethod, setFundMethod] = useState(null); // 'transfer' or 'card'
+            const [fundMethod, setFundMethod] = useState(null); 
             const [customerList, setCustomerList] = useState([]);
 
             useEffect(() => {
-                // 1. Check Authentication
                 const session = JSON.parse(localStorage.getItem('currentUser'));
                 if (!session) {
-                    window.location.href = 'index.html'; // Redirect to login/home
+                    window.location.href = 'index.html';
                 } else {
                     setUser(session);
-                    // 2. Load User Balance
-                    const storedUser = JSON.parse(localStorage.getItem(`user_${session.email}`));
-                    if (storedUser) setBalance(storedUser.balance || 0);
+                    
+                    // 2. CLOUD SYNC: Listen for real-time balance changes
+                    const userBalanceRef = db.ref(`users/${session.email.replace('.', '_')}/balance`);
+                    userBalanceRef.on('value', (snapshot) => {
+                        const cloudBalance = snapshot.val();
+                        setBalance(cloudBalance || 0);
+                    });
                 }
 
-                // 3. Admin: Load all registered customers
+                // 3. ADMIN: Load all customers from Cloud
                 if (session?.role === 'admin') {
-                    const users = [];
-                    for (let i = 0; i < localStorage.length; i++) {
-                        const key = localStorage.key(i);
-                        if (key.startsWith('user_')) {
-                            users.push(JSON.parse(localStorage.getItem(key)));
+                    db.ref('users').on('value', (snapshot) => {
+                        const data = snapshot.val();
+                        if (data) {
+                            const list = Object.keys(data).map(key => data[key]);
+                            setCustomerList(list);
                         }
-                    }
-                    setCustomerList(users);
+                    });
                 }
             }, []);
 
             const handlePaymentComplete = (amount) => {
                 if (!amount || isNaN(amount)) return;
                 const newBal = balance + parseFloat(amount);
-                setBalance(newBal);
                 
-                // Update specific user in "Database"
-                const userData = JSON.parse(localStorage.getItem(`user_${user.email}`));
-                if (userData) {
-                    userData.balance = newBal;
-                    localStorage.setItem(`user_${user.email}`, JSON.stringify(userData));
-                }
+                // 4. SAVE TO CLOUD (Replaces localStorage)
+                const userKey = user.email.replace('.', '_');
+                db.ref(`users/${userKey}`).update({
+                    balance: newBal,
+                    email: user.email,
+                    name: user.name || "Customer"
+                });
                 
                 alert(`Successfully funded $${amount}!`);
                 setFundMethod(null);
@@ -69,13 +90,13 @@
                 window.location.href = 'index.html';
             };
 
-            if (!user) return <div className="p-10 text-center">Loading...</div>;
+            if (!user) return <div className="p-10 text-center">Loading Cloud...</div>;
 
             return (
                 <div className="min-h-screen">
                     {/* TOP NAVIGATION */}
                     <nav className="bg-white border-b px-8 py-4 flex justify-between items-center shadow-sm">
-                        <h1 className="text-xl font-black text-blue-600 tracking-tight">MY BUSINESS</h1>
+                        <h1 className="text-xl font-black text-blue-600 tracking-tight">CORTEX GOLD</h1>
                         <div className="flex items-center gap-4">
                             <span className="text-sm font-medium bg-gray-100 px-3 py-1 rounded-full">{user.email}</span>
                             <button onClick={logout} className="text-red-500 font-bold text-sm">Logout</button>
@@ -91,7 +112,7 @@
                                     <table className="w-full text-left">
                                         <thead className="bg-gray-50 border-b">
                                             <tr>
-                                                <th className="p-4 font-semibold text-gray-600">Customer Name</th>
+                                                <th className="p-4 font-semibold text-gray-600">Customer</th>
                                                 <th className="p-4 font-semibold text-gray-600">Email</th>
                                                 <th className="p-4 font-semibold text-gray-600">Wallet Balance</th>
                                             </tr>
