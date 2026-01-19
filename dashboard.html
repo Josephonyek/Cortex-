@@ -70,7 +70,7 @@
                 if (confirm(`Buy ${name} for ₦${price}?`)) {
                     db.ref(`users/${user.uid}/balance`).transaction(c => (c || 0) - price)
                     .then(() => {
-                        window.open(`https://wa.me/2349037416009?text=I bought ${name}`, '_blank');
+                        window.open(`https://wa.me/2349118363627?text=I bought ${name}`, '_blank');
                     });
                 }
             };
