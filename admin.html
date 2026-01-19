@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cortex Admin | Store Manager</title>
+    <title>Cortex Master | Admin</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -27,92 +27,98 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        function AdminStore() {
+        function Admin() {
             const [isLocked, setIsLocked] = useState(true);
             const [pass, setPass] = useState('');
+            const [users, setUsers] = useState([]);
             const [products, setProducts] = useState([]);
-            const [pName, setPName] = useState('');
-            const [pPrice, setPPrice] = useState('');
-            const [pIcon, setPIcon] = useState('📦');
+            const [newP, setNewP] = useState({ name: '', price: '', icon: '📦' });
 
-            const ADMIN_SECRET = "Cortex2026"; 
+            const SECRET = "Cortex2026";
 
             useEffect(() => {
                 if (!isLocked) {
-                    // Fetch live products
-                    db.ref('products').on('value', snap => {
-                        const data = snap.val();
-                        setProducts(data ? Object.entries(data) : []);
-                    });
+                    db.ref('users').on('value', s => setUsers(s.val() ? Object.values(s.val()) : []));
+                    db.ref('products').on('value', s => setProducts(s.val() ? Object.entries(s.val()) : []));
                 }
             }, [isLocked]);
 
-            const uploadProduct = (e) => {
+            // --- USER BALANCE LOGIC ---
+            const updateBalance = (uid, current, type) => {
+                const val = prompt(type === 'set' ? "Set EXACT total balance:" : "Amount to ADD:");
+                if (!val || isNaN(val)) return;
+                
+                const final = type === 'set' ? Number(val) : Number(current) + Number(val);
+                db.ref(`users/${uid}/balance`).set(final);
+            };
+
+            // --- PRODUCT LOGIC ---
+            const addProduct = (e) => {
                 e.preventDefault();
-                const productId = Date.now(); // Unique ID for product
-                db.ref(`products/${productId}`).set({
-                    name: pName,
-                    price: Number(pPrice),
-                    icon: pIcon
-                }).then(() => {
-                    alert("Product uploaded successfully!");
-                    setPName(''); setPPrice('');
-                });
+                db.ref(`products/${Date.now()}`).set({...newP, price: Number(newP.price)});
+                setNewP({ name: '', price: '', icon: '📦' });
             };
 
-            const deleteProduct = (id) => {
-                if(confirm("Remove this product from the store?")) {
-                    db.ref(`products/${id}`).remove();
-                }
-            };
-
-            if (isLocked) {
-                return (
-                    <div className="h-screen flex items-center justify-center bg-blue-600 p-6">
-                        <form onSubmit={(e) => {e.preventDefault(); if(pass === ADMIN_SECRET) setIsLocked(false); else alert("Wrong Pass");}} className="bg-white p-8 rounded-[2rem] shadow-2xl w-full max-w-sm">
-                            <h1 className="text-xl font-black text-center mb-6 uppercase tracking-tighter">Cortex Admin</h1>
-                            <input type="password" placeholder="Passcode" className="w-full p-4 border rounded-2xl mb-4 text-center" onChange={e => setPass(e.target.value)} />
-                            <button className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold">Unlock Store</button>
-                        </form>
-                    </div>
-                );
-            }
+            if (isLocked) return (
+                <div className="h-screen flex items-center justify-center bg-blue-600">
+                    <form onSubmit={(e) => {e.preventDefault(); if(pass===SECRET) setIsLocked(false); else alert("Invalid") }} className="bg-white p-8 rounded-3xl shadow-xl">
+                        <input type="password" placeholder="Passcode" className="p-4 border rounded-xl mb-4 w-full" onChange={e=>setPass(e.target.value)} />
+                        <button className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">Unlock</button>
+                    </form>
+                </div>
+            );
 
             return (
-                <div className="p-6 max-w-4xl mx-auto pb-20">
-                    <h1 className="text-3xl font-black text-blue-600 mb-8 italic">STORE MANAGER</h1>
+                <div className="p-4 md:p-10 max-w-6xl mx-auto">
+                    <h1 className="text-3xl font-black text-blue-600 mb-10">CORTEX CONTROL</h1>
 
-                    {/* UPLOAD FORM */}
-                    <div className="bg-white p-8 rounded-[2rem] shadow-sm border mb-10">
-                        <h2 className="font-bold text-lg mb-6">Upload New Product</h2>
-                        <form onSubmit={uploadProduct} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <input value={pIcon} onChange={e => setPIcon(e.target.value)} placeholder="Emoji (e.g. 🎮)" className="p-4 bg-gray-50 rounded-2xl border outline-none" required />
-                            <input value={pName} onChange={e => setPName(e.target.value)} placeholder="Product Name" className="p-4 bg-gray-50 rounded-2xl border outline-none" required />
-                            <input value={pPrice} onChange={e => setPPrice(e.target.value)} type="number" placeholder="Price (₦)" className="p-4 bg-gray-50 rounded-2xl border outline-none" required />
-                            <button className="md:col-span-3 bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-blue-700">Add Product to Site</button>
-                        </form>
-                    </div>
-
-                    {/* LIVE INVENTORY */}
-                    <h2 className="font-bold text-gray-400 text-xs uppercase tracking-widest mb-4">Live Inventory</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {products.map(([id, p]) => (
-                            <div key={id} className="bg-white p-6 rounded-3xl border flex justify-between items-center shadow-sm">
-                                <div className="flex items-center gap-4">
-                                    <span className="text-3xl">{p.icon}</span>
-                                    <div>
-                                        <div className="font-bold text-gray-800">{p.name}</div>
-                                        <div className="text-blue-600 font-black">₦{p.price.toLocaleString()}</div>
+                    <div className="grid lg:grid-cols-2 gap-10">
+                        {/* 1. PRODUCT UPLOADER */}
+                        <section className="bg-white p-6 rounded-3xl border shadow-sm">
+                            <h2 className="font-bold mb-4">Upload Product</h2>
+                            <form onSubmit={addProduct} className="space-y-3">
+                                <input value={newP.icon} onChange={e=>setNewP({...newP, icon:e.target.value})} placeholder="Icon (🎮)" className="w-full p-3 bg-gray-50 rounded-xl border" />
+                                <input value={newP.name} onChange={e=>setNewP({...newP, name:e.target.value})} placeholder="Product Name" className="w-full p-3 bg-gray-50 rounded-xl border" required />
+                                <input value={newP.price} onChange={e=>setNewP({...newP, price:e.target.value})} type="number" placeholder="Price (₦)" className="w-full p-3 bg-gray-50 rounded-xl border" required />
+                                <button className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">Add to Site</button>
+                            </form>
+                            <div className="mt-6 space-y-2">
+                                {products.map(([id, p]) => (
+                                    <div key={id} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
+                                        <span>{p.icon} {p.name} - ₦{p.price}</span>
+                                        <button onClick={()=>db.ref(`products/${id}`).remove()} className="text-red-500 text-xs font-bold">DELETE</button>
                                     </div>
-                                </div>
-                                <button onClick={() => deleteProduct(id)} className="text-red-500 font-bold text-xs bg-red-50 px-4 py-2 rounded-xl">DELETE</button>
+                                ))}
                             </div>
-                        ))}
+                        </section>
+
+                        {/* 2. USER MANAGEMENT */}
+                        <section className="bg-white p-6 rounded-3xl border shadow-sm">
+                            <h2 className="font-bold mb-4">User Wallets & Database</h2>
+                            <div className="space-y-4">
+                                {users.map((u, i) => (
+                                    <div key={i} className="p-4 border rounded-2xl bg-gray-50">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div>
+                                                <p className="font-bold text-blue-600">@{u.username}</p>
+                                                <p className="text-[10px] text-gray-400 uppercase tracking-tighter">{u.email}</p>
+                                                <p className="text-xs font-medium">{u.phone}</p>
+                                            </div>
+                                            <p className="text-xl font-black">₦{u.balance?.toLocaleString()}</p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => updateBalance(u.uid, u.balance, 'add')} className="flex-1 bg-green-500 text-white py-2 rounded-lg text-[10px] font-bold">+ ADD CASH</button>
+                                            <button onClick={() => updateBalance(u.uid, u.balance, 'set')} className="flex-1 bg-gray-800 text-white py-2 rounded-lg text-[10px] font-bold">SET EXACT</button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
                     </div>
                 </div>
             );
         }
-        ReactDOM.createRoot(document.getElementById('root')).render(<AdminStore />);
+        ReactDOM.createRoot(document.getElementById('root')).render(<Admin />);
     </script>
 </body>
 </html>
