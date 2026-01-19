@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cortex Admin | Master Control</title>
+    <title>Cortex Admin | Store Manager</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -27,94 +27,92 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        function AdminPanel() {
+        function AdminStore() {
             const [isLocked, setIsLocked] = useState(true);
             const [pass, setPass] = useState('');
-            const [users, setUsers] = useState([]);
+            const [products, setProducts] = useState([]);
+            const [pName, setPName] = useState('');
+            const [pPrice, setPPrice] = useState('');
+            const [pIcon, setPIcon] = useState('📦');
+
             const ADMIN_SECRET = "Cortex2026"; 
 
             useEffect(() => {
                 if (!isLocked) {
-                    db.ref('users').on('value', snap => {
+                    // Fetch live products
+                    db.ref('products').on('value', snap => {
                         const data = snap.val();
-                        setUsers(data ? Object.values(data) : []);
+                        setProducts(data ? Object.entries(data) : []);
                     });
                 }
             }, [isLocked]);
 
-            const handleUnlock = (e) => {
+            const uploadProduct = (e) => {
                 e.preventDefault();
-                if (pass === ADMIN_SECRET) setIsLocked(false);
-                else alert("Wrong password!");
+                const productId = Date.now(); // Unique ID for product
+                db.ref(`products/${productId}`).set({
+                    name: pName,
+                    price: Number(pPrice),
+                    icon: pIcon
+                }).then(() => {
+                    alert("Product uploaded successfully!");
+                    setPName(''); setPPrice('');
+                });
             };
 
-            // NEW: MANUAL CREDIT FUNCTION
-            const creditUser = (uid, currentBalance) => {
-                const amount = prompt("Enter amount to ADD to this user's balance:");
-                if (!amount || isNaN(amount)) return;
-
-                const newBalance = Number(currentBalance) + Number(amount);
-                db.ref(`users/${uid}/balance`).set(newBalance)
-                    .then(() => alert(`Successfully added ₦${amount} to user.`))
-                    .catch(err => alert("Error updating balance."));
+            const deleteProduct = (id) => {
+                if(confirm("Remove this product from the store?")) {
+                    db.ref(`products/${id}`).remove();
+                }
             };
 
             if (isLocked) {
                 return (
-                    <div className="h-screen flex items-center justify-center bg-blue-700">
-                        <form onSubmit={handleUnlock} className="bg-white p-10 rounded-[2.5rem] shadow-2xl text-center">
-                            <h1 className="text-2xl font-black mb-6 italic">CORTEX ADMIN</h1>
+                    <div className="h-screen flex items-center justify-center bg-blue-600 p-6">
+                        <form onSubmit={(e) => {e.preventDefault(); if(pass === ADMIN_SECRET) setIsLocked(false); else alert("Wrong Pass");}} className="bg-white p-8 rounded-[2rem] shadow-2xl w-full max-w-sm">
+                            <h1 className="text-xl font-black text-center mb-6 uppercase tracking-tighter">Cortex Admin</h1>
                             <input type="password" placeholder="Passcode" className="w-full p-4 border rounded-2xl mb-4 text-center" onChange={e => setPass(e.target.value)} />
-                            <button className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold">Access Database</button>
+                            <button className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold">Unlock Store</button>
                         </form>
                     </div>
                 );
             }
 
             return (
-                <div className="p-6 max-w-5xl mx-auto">
-                    <div className="flex justify-between items-center mb-8">
-                        <h1 className="text-3xl font-black text-blue-600">Admin Console</h1>
-                        <button onClick={() => setIsLocked(true)} className="text-gray-400 font-bold uppercase text-xs">Lock</button>
+                <div className="p-6 max-w-4xl mx-auto pb-20">
+                    <h1 className="text-3xl font-black text-blue-600 mb-8 italic">STORE MANAGER</h1>
+
+                    {/* UPLOAD FORM */}
+                    <div className="bg-white p-8 rounded-[2rem] shadow-sm border mb-10">
+                        <h2 className="font-bold text-lg mb-6">Upload New Product</h2>
+                        <form onSubmit={uploadProduct} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <input value={pIcon} onChange={e => setPIcon(e.target.value)} placeholder="Emoji (e.g. 🎮)" className="p-4 bg-gray-50 rounded-2xl border outline-none" required />
+                            <input value={pName} onChange={e => setPName(e.target.value)} placeholder="Product Name" className="p-4 bg-gray-50 rounded-2xl border outline-none" required />
+                            <input value={pPrice} onChange={e => setPPrice(e.target.value)} type="number" placeholder="Price (₦)" className="p-4 bg-gray-50 rounded-2xl border outline-none" required />
+                            <button className="md:col-span-3 bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-blue-700">Add Product to Site</button>
+                        </form>
                     </div>
 
-                    <div className="bg-white rounded-[2rem] shadow-sm border overflow-hidden">
-                        <table className="w-full text-left">
-                            <thead className="bg-gray-50 text-gray-400 text-[10px] uppercase font-bold tracking-widest border-b">
-                                <tr>
-                                    <th className="p-6">User Details</th>
-                                    <th className="p-6">Current Balance</th>
-                                    <th className="p-6 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                                {users.map((u, i) => (
-                                    <tr key={i} className="hover:bg-blue-50/30 transition">
-                                        <td className="p-6">
-                                            <div className="font-bold text-gray-800">@{u.username || 'unknown'}</div>
-                                            <div className="text-xs text-gray-400">{u.email}</div>
-                                            <div className="text-[10px] text-blue-400 font-bold">{u.phone}</div>
-                                        </td>
-                                        <td className="p-6">
-                                            <span className="text-2xl font-black">₦{(u.balance || 0).toLocaleString()}</span>
-                                        </td>
-                                        <td className="p-6 text-right">
-                                            <button 
-                                                onClick={() => creditUser(u.uid, u.balance || 0)}
-                                                className="bg-green-500 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-green-600 shadow-lg shadow-green-100"
-                                            >
-                                                + ADD FUNDS
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    {/* LIVE INVENTORY */}
+                    <h2 className="font-bold text-gray-400 text-xs uppercase tracking-widest mb-4">Live Inventory</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {products.map(([id, p]) => (
+                            <div key={id} className="bg-white p-6 rounded-3xl border flex justify-between items-center shadow-sm">
+                                <div className="flex items-center gap-4">
+                                    <span className="text-3xl">{p.icon}</span>
+                                    <div>
+                                        <div className="font-bold text-gray-800">{p.name}</div>
+                                        <div className="text-blue-600 font-black">₦{p.price.toLocaleString()}</div>
+                                    </div>
+                                </div>
+                                <button onClick={() => deleteProduct(id)} className="text-red-500 font-bold text-xs bg-red-50 px-4 py-2 rounded-xl">DELETE</button>
+                            </div>
+                        ))}
                     </div>
                 </div>
             );
         }
-        ReactDOM.createRoot(document.getElementById('root')).render(<AdminPanel />);
+        ReactDOM.createRoot(document.getElementById('root')).render(<AdminStore />);
     </script>
 </body>
 </html>
