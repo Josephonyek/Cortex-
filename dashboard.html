@@ -14,10 +14,8 @@
 </head>
 <body class="bg-gray-50 text-gray-900">
     <div id="root"></div>
-
     <script type="text/babel">
         const { useState, useEffect } = React;
-
         const firebaseConfig = {
             apiKey: "AIzaSyAzXdmATMQ8bMAtCIMiruUr4o5lGLMTSco",
             authDomain: "cortex-gold-6c147.firebaseapp.com",
@@ -27,122 +25,90 @@
             messagingSenderId: "744887943177",
             appId: "1:744887943177:web:c0f4aa606e6e204c7d38d8"
         };
-
-        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
         function Dashboard() {
             const [user, setUser] = useState(null);
             const [balance, setBalance] = useState(0);
             const [products, setProducts] = useState([]);
-            const [loading, setLoading] = useState(true);
 
             useEffect(() => {
                 const session = JSON.parse(localStorage.getItem('currentUser'));
-                if (!session) { window.location.href = 'login.html'; return; }
+                if (!session || !session.uid) { window.location.href = 'login.html'; return; }
                 setUser(session);
 
-                const userKey = session.email.replace(/\./g, '_');
-
-                // 1. Sync User Balance
-                db.ref(`users/${userKey}/balance`).on('value', (snap) => {
-                    setBalance(snap.val() || 0);
+                // REAL-TIME BALANCE SYNC USING UID
+                const userRef = db.ref(`users/${session.uid}`);
+                userRef.on('value', (snap) => {
+                    const data = snap.val();
+                    if (data) setBalance(data.balance || 0);
                 });
 
-                // 2. Sync Dynamic Products from Admin
+                // SYNC PRODUCTS
                 db.ref('products').on('value', (snap) => {
                     const data = snap.val();
-                    if (data) {
-                        setProducts(Object.values(data));
-                    }
-                    setLoading(false);
+                    if (data) setProducts(Object.values(data));
                 });
             }, []);
 
             const fundWallet = () => {
                 const amt = prompt("Amount to add (₦):");
-                if (!amt || amt < 100) return alert("Minimum ₦100");
-
+                if (!amt || amt < 100) return alert("Min ₦100");
                 const handler = PaystackPop.setup({
                     key: 'pk_test_77e96f0549cd29e76ce2117f8adf00a5a96658ea',
                     email: user.email,
                     amount: amt * 100,
                     currency: "NGN",
-                    callback: (res) => alert("Payment success! Updating wallet...")
+                    callback: (res) => alert("Success! Wallet will update soon.")
                 });
                 handler.openIframe();
             };
 
             const buyProduct = (name, price) => {
-                if (balance < price) return alert("Insufficient balance!");
-
-                if (confirm(`Purchase ${name} for ₦${price}?`)) {
-                    const userKey = user.email.replace(/\./g, '_');
-                    
-                    // Deduct balance and Log Order
-                    db.ref(`users/${userKey}/balance`).transaction((curr) => (curr || 0) - price)
+                if (balance < price) return alert("Insufficient funds!");
+                if (confirm(`Buy ${name} for ₦${price}?`)) {
+                    db.ref(`users/${user.uid}/balance`).transaction(c => (c || 0) - price)
                     .then(() => {
-                        const orderId = Date.now();
-                        db.ref(`orders/${orderId}`).set({
-                            user: user.email,
-                            product: name,
-                            price: price,
-                            status: 'pending',
-                            time: new Date().toLocaleString()
-                        });
-                        alert("Order placed! Redirecting to WhatsApp for fulfillment.");
-                        window.open(`https://wa.me/2349037416009?text=Order ID: ${orderId}. I just bought ${name} on Cortex Gold.`, '_blank');
+                        window.open(`https://wa.me/2349037416009?text=I bought ${name}`, '_blank');
                     });
                 }
             };
 
-            if (loading) return <div className="h-screen flex items-center justify-center font-black text-blue-600 animate-pulse">CORTEX GOLD...</div>;
+            if (!user) return null;
 
             return (
-                <div className="max-w-md mx-auto min-h-screen bg-gray-50 pb-24">
+                <div className="max-w-md mx-auto min-h-screen pb-20">
                     <header className="p-6 flex justify-between items-center">
-                        <h1 className="font-black text-2xl text-blue-600 tracking-tighter">CORTEX GOLD</h1>
-                        <button onClick={() => {localStorage.clear(); window.location.href='login.html'}} className="bg-gray-200 px-4 py-2 rounded-full text-[10px] font-bold uppercase">Logout</button>
+                        <h1 className="font-black text-2xl text-blue-600">CORTEX GOLD</h1>
+                        <button onClick={() => {localStorage.clear(); window.location.href='login.html'}} className="text-[10px] font-bold text-gray-400">LOGOUT</button>
                     </header>
-
                     <div className="px-6">
-                        <div className="bg-blue-600 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-blue-200 border-b-4 border-blue-800">
-                            <p className="text-blue-200 text-xs font-bold uppercase tracking-widest">Cloud Wallet</p>
+                        <div className="bg-blue-600 rounded-[2.5rem] p-8 text-white shadow-xl">
+                            <p className="text-xs font-bold opacity-70">WALLET BALANCE</p>
                             <h2 className="text-5xl font-black mt-2 mb-6">₦{balance.toLocaleString()}</h2>
-                            <button onClick={fundWallet} className="bg-white text-blue-600 px-10 py-4 rounded-2xl font-black text-sm active:scale-95 transition">
-                                + FUND WALLET
-                            </button>
+                            <button onClick={fundWallet} className="bg-white text-blue-600 px-8 py-3 rounded-xl font-bold text-sm">+ FUND</button>
                         </div>
                     </div>
-
                     <div className="p-6">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="font-black text-gray-400 text-xs uppercase tracking-widest">Marketplace</h3>
-                            <span className="text-[10px] bg-green-100 text-green-600 px-2 py-1 rounded font-bold">LIVE</span>
-                        </div>
-                        
+                        <h3 className="text-xs font-bold text-gray-400 mb-4 uppercase tracking-widest">Marketplace</h3>
                         <div className="grid grid-cols-2 gap-4">
-                            {products.length > 0 ? products.map((item, i) => (
-                                <div key={i} onClick={() => buyProduct(item.name, item.price)} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm active:bg-gray-100 cursor-pointer transition">
-                                    <div className="text-3xl mb-2">{item.icon || '📦'}</div>
-                                    <h4 className="font-bold text-sm text-gray-800 truncate">{item.name}</h4>
-                                    <p className="text-blue-600 font-black">₦{item.price.toLocaleString()}</p>
+                            {products.map((p, i) => (
+                                <div key={i} onClick={() => buyProduct(p.name, p.price)} className="bg-white p-5 rounded-3xl border shadow-sm active:bg-gray-100 cursor-pointer">
+                                    <div className="text-3xl mb-2">{p.icon || '📦'}</div>
+                                    <h4 className="font-bold text-sm truncate">{p.name}</h4>
+                                    <p className="text-blue-600 font-black">₦{p.price}</p>
                                 </div>
-                            )) : (
-                                <p className="col-span-2 text-center text-gray-400 text-sm py-10">No products available yet.</p>
-                            )}
+                            ))}
                         </div>
                     </div>
-
                     <a href="https://wa.me/2349037416009" target="_blank" className="fixed bottom-6 right-6 bg-green-500 p-4 rounded-full shadow-2xl">
-                        <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" className="w-8 h-8" />
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" className="w-8 h-8" alt="Support" />
                     </a>
                 </div>
             );
         }
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<Dashboard />);
+        ReactDOM.createRoot(document.getElementById('root')).render(<Dashboard />);
     </script>
 </body>
 </html>

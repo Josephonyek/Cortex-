@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cortex Gold | Access</title>
+    <title>Cortex Gold | Login</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -16,7 +16,6 @@
     <div id="root"></div>
     <script type="text/babel">
         const { useState } = React;
-
         const firebaseConfig = {
             apiKey: "AIzaSyAzXdmATMQ8bMAtCIMiruUr4o5lGLMTSco",
             authDomain: "cortex-gold-6c147.firebaseapp.com",
@@ -26,28 +25,27 @@
             messagingSenderId: "744887943177",
             appId: "1:744887943177:web:c0f4aa606e6e204c7d38d8"
         };
-        
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.database();
 
         function AuthPage() {
             const [isLogin, setIsLogin] = useState(true);
-            const [loading, setLoading] = useState(false);
             const [data, setData] = useState({ email: '', password: '', user: '', phone: '' });
 
             const handleAction = async (e) => {
                 e.preventDefault();
-                setLoading(true);
                 try {
                     if (isLogin) {
                         const res = await auth.signInWithEmailAndPassword(data.email, data.password);
                         if (!res.user.emailVerified) {
-                            alert("Please verify your email! Check your spam folder.");
+                            alert("Verify your email first!");
                             await auth.signOut();
                         } else {
+                            // FETCH FULL USER DATA USING UID
                             db.ref(`users/${res.user.uid}`).once('value', (snap) => {
-                                localStorage.setItem('currentUser', JSON.stringify(snap.val()));
+                                const userData = snap.val();
+                                localStorage.setItem('currentUser', JSON.stringify(userData));
                                 window.location.href = 'dashboard.html';
                             });
                         }
@@ -61,39 +59,27 @@
                             email: data.email,
                             balance: 0
                         });
-                        alert("Verification email sent! Check your inbox.");
+                        alert("Verification email sent!");
                         setIsLogin(true);
                     }
                 } catch (err) { alert(err.message); }
-                setLoading(false);
             };
 
             return (
                 <div className="flex min-h-screen items-center justify-center p-4">
-                    <div className="w-full max-w-md bg-white p-10 rounded-[2.5rem] shadow-2xl border border-gray-100">
+                    <div className="w-full max-w-md bg-white p-10 rounded-[2.5rem] shadow-2xl">
                         <h1 className="text-3xl font-black text-blue-600 text-center italic mb-8">CORTEX GOLD</h1>
-                        
                         <form onSubmit={handleAction} className="space-y-4">
                             {!isLogin && (
-                                <>
-                                    <input type="text" placeholder="Username" className="w-full p-4 bg-gray-50 rounded-2xl border outline-none focus:border-blue-500" 
-                                        onChange={e => setData({...data, user: e.target.value})} required />
-                                    <input type="tel" placeholder="Phone Number" className="w-full p-4 bg-gray-50 rounded-2xl border outline-none focus:border-blue-500" 
-                                        onChange={e => setData({...data, phone: e.target.value})} required />
-                                </>
+                                <><input type="text" placeholder="Username" className="w-full p-4 bg-gray-50 rounded-2xl border" onChange={e => setData({...data, user: e.target.value})} required />
+                                <input type="tel" placeholder="Phone" className="w-full p-4 bg-gray-50 rounded-2xl border" onChange={e => setData({...data, phone: e.target.value})} required /></>
                             )}
-                            <input type="email" placeholder="Email" className="w-full p-4 bg-gray-50 rounded-2xl border outline-none focus:border-blue-500" 
-                                onChange={e => setData({...data, email: e.target.value})} required />
-                            <input type="password" placeholder="Password" className="w-full p-4 bg-gray-50 rounded-2xl border outline-none focus:border-blue-500" 
-                                onChange={e => setData({...data, password: e.target.value})} required />
-                            
-                            <button className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-blue-200 transition">
-                                {loading ? 'Processing...' : (isLogin ? 'LOG IN' : 'CREATE ACCOUNT')}
-                            </button>
+                            <input type="email" placeholder="Email" className="w-full p-4 bg-gray-50 rounded-2xl border" onChange={e => setData({...data, email: e.target.value})} required />
+                            <input type="password" placeholder="Password" className="w-full p-4 bg-gray-50 rounded-2xl border" onChange={e => setData({...data, password: e.target.value})} required />
+                            <button className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold">{isLogin ? 'LOG IN' : 'CREATE ACCOUNT'}</button>
                         </form>
-
-                        <p onClick={() => setIsLogin(!isLogin)} className="text-center mt-6 text-xs font-bold text-gray-400 cursor-pointer hover:text-blue-500">
-                            {isLogin ? "DON'T HAVE AN ACCOUNT? SIGN UP" : "ALREADY HAVE AN ACCOUNT? LOG IN"}
+                        <p onClick={() => setIsLogin(!isLogin)} className="text-center mt-6 text-xs font-bold text-gray-400 cursor-pointer uppercase">
+                            {isLogin ? "Need an account? Sign Up" : "Have an account? Login"}
                         </p>
                     </div>
                 </div>
