@@ -3,18 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cortex Gold | Login</title>
+    <title>Cortex Gold | Access</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
 </head>
 <body class="bg-gray-50">
     <div id="root"></div>
     <script type="text/babel">
         const { useState } = React;
+
         const firebaseConfig = {
             apiKey: "AIzaSyAzXdmATMQ8bMAtCIMiruUr4o5lGLMTSco",
             authDomain: "cortex-gold-6c147.firebaseapp.com",
@@ -24,52 +26,80 @@
             messagingSenderId: "744887943177",
             appId: "1:744887943177:web:c0f4aa606e6e204c7d38d8"
         };
+        
         firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
         const db = firebase.database();
 
-        function Login() {
-            const [email, setEmail] = useState('');
-            const [isNewUser, setIsNewUser] = useState(false);
+        function AuthPage() {
+            const [isLogin, setIsLogin] = useState(true);
+            const [loading, setLoading] = useState(false);
+            const [data, setData] = useState({ email: '', password: '', user: '', phone: '' });
 
-            const handleAuth = async (e) => {
+            const handleAction = async (e) => {
                 e.preventDefault();
-                const userKey = email.toLowerCase().replace(/\./g, '_');
-                
-                if (isNewUser) {
-                    const newUser = { email: email.toLowerCase(), balance: 0 };
-                    await db.ref(`users/${userKey}`).set(newUser);
-                    localStorage.setItem('currentUser', JSON.stringify(newUser));
-                    window.location.href = 'dashboard.html';
-                } else {
-                    db.ref(`users/${userKey}`).once('value', (snap) => {
-                        if (snap.exists()) {
-                            localStorage.setItem('currentUser', JSON.stringify(snap.val()));
-                            window.location.href = 'dashboard.html';
+                setLoading(true);
+                try {
+                    if (isLogin) {
+                        const res = await auth.signInWithEmailAndPassword(data.email, data.password);
+                        if (!res.user.emailVerified) {
+                            alert("Please verify your email! Check your spam folder.");
+                            await auth.signOut();
                         } else {
-                            alert("User not found. Try Signing Up!");
+                            db.ref(`users/${res.user.uid}`).once('value', (snap) => {
+                                localStorage.setItem('currentUser', JSON.stringify(snap.val()));
+                                window.location.href = 'dashboard.html';
+                            });
                         }
-                    });
-                }
+                    } else {
+                        const res = await auth.createUserWithEmailAndPassword(data.email, data.password);
+                        await res.user.sendEmailVerification();
+                        await db.ref(`users/${res.user.uid}`).set({
+                            uid: res.user.uid,
+                            username: data.user,
+                            phone: data.phone,
+                            email: data.email,
+                            balance: 0
+                        });
+                        alert("Verification email sent! Check your inbox.");
+                        setIsLogin(true);
+                    }
+                } catch (err) { alert(err.message); }
+                setLoading(false);
             };
 
             return (
-                <div className="flex min-h-screen items-center justify-center p-6">
-                    <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-sm">
-                        <h2 className="text-2xl font-black text-blue-600 mb-6 text-center">CORTEX GOLD</h2>
-                        <form onSubmit={handleAuth} className="space-y-4">
-                            <input type="email" placeholder="Enter Email" className="w-full p-4 border rounded-xl" onChange={e => setEmail(e.target.value)} required />
-                            <button className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold">
-                                {isNewUser ? 'Create Wallet' : 'Login to Wallet'}
+                <div className="flex min-h-screen items-center justify-center p-4">
+                    <div className="w-full max-w-md bg-white p-10 rounded-[2.5rem] shadow-2xl border border-gray-100">
+                        <h1 className="text-3xl font-black text-blue-600 text-center italic mb-8">CORTEX GOLD</h1>
+                        
+                        <form onSubmit={handleAction} className="space-y-4">
+                            {!isLogin && (
+                                <>
+                                    <input type="text" placeholder="Username" className="w-full p-4 bg-gray-50 rounded-2xl border outline-none focus:border-blue-500" 
+                                        onChange={e => setData({...data, user: e.target.value})} required />
+                                    <input type="tel" placeholder="Phone Number" className="w-full p-4 bg-gray-50 rounded-2xl border outline-none focus:border-blue-500" 
+                                        onChange={e => setData({...data, phone: e.target.value})} required />
+                                </>
+                            )}
+                            <input type="email" placeholder="Email" className="w-full p-4 bg-gray-50 rounded-2xl border outline-none focus:border-blue-500" 
+                                onChange={e => setData({...data, email: e.target.value})} required />
+                            <input type="password" placeholder="Password" className="w-full p-4 bg-gray-50 rounded-2xl border outline-none focus:border-blue-500" 
+                                onChange={e => setData({...data, password: e.target.value})} required />
+                            
+                            <button className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-blue-200 transition">
+                                {loading ? 'Processing...' : (isLogin ? 'LOG IN' : 'CREATE ACCOUNT')}
                             </button>
                         </form>
-                        <button onClick={() => setIsNewUser(!isNewUser)} className="w-full mt-4 text-xs text-gray-400 font-bold uppercase">
-                            {isNewUser ? 'Already have a wallet? Login' : 'Need a wallet? Sign up'}
-                        </button>
+
+                        <p onClick={() => setIsLogin(!isLogin)} className="text-center mt-6 text-xs font-bold text-gray-400 cursor-pointer hover:text-blue-500">
+                            {isLogin ? "DON'T HAVE AN ACCOUNT? SIGN UP" : "ALREADY HAVE AN ACCOUNT? LOG IN"}
+                        </p>
                     </div>
                 </div>
             );
         }
-        ReactDOM.createRoot(document.getElementById('root')).render(<Login />);
+        ReactDOM.createRoot(document.getElementById('root')).render(<AuthPage />);
     </script>
 </body>
 </html>
